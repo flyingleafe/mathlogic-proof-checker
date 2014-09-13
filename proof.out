@@ -1,0 +1,6 @@
+Var "a"
+Var "a" `Cons` (Var "b" `Cons` Var "a")
+Var "b" `Cons` Var "a"
+(line 1, column 6):
+unexpected "b"
+expecting space, "&" or "|"
