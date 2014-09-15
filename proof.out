@@ -1,6 +1,6 @@
-Var "a"
-Var "a" `Cons` (Var "b" `Cons` Var "a")
-Var "b" `Cons` Var "a"
-(line 1, column 6):
-unexpected "b"
-expecting space, "&" or "|"
+a -> b -> a (сх. акс. 1)
+(a -> b -> a) -> (a -> (b -> a) -> a) -> a -> a (сх. акс. 2)
+a -> (b -> a) -> a (сх. акс. 1)
+(a -> (b -> a) -> a) -> a -> a (M. P 1, 2)
+a -> a (M. P 3, 4)
+

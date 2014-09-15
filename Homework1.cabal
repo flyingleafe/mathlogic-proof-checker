@@ -22,6 +22,7 @@ executable Homework1
   build-depends:       base >=4.6 && <4.7
                      , ghc >= 7.6.3
                      , hashtables
+                     , hashable
                      , parsec
   -- hs-source-dirs:      
   default-language:    Haskell2010

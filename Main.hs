@@ -17,9 +17,15 @@ main = do
   inp  <- openFile inputFile ReadMode
   outp <- openFile outputFile WriteMode
   cnt <- hGetContents inp
-  let statements = sequence $ map parseLine $ lines cnt
+  let statements = sequence . map parseLine . lines $ cnt
   case statements of
-    Left err -> print err
-    Right exprs -> runST $ proofCheck exprs
+    Left err -> hPrint outp err
+    Right exprs -> do
+      let checked = runST $ proofCheck exprs
+      case checked of
+       Left err -> hPutStrLn outp err
+       Right list ->
+         let showChecked (l, an) = show l ++ " (" ++ an ++ ")"
+         in hPutStrLn outp $ unlines . map showChecked $ list
   hClose inp
   hClose outp

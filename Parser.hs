@@ -1,7 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Parser (Logic, parseLine) where
+module Parser (Logic(..)
+              , firstl
+              , secondl
+              , parseLine
+              , similar
+              , similarOrGt) where
 
 import Text.ParserCombinators.Parsec
+import Data.Hashable
 
 data Logic = Var String
            | Logic `And` Logic
@@ -9,6 +15,20 @@ data Logic = Var String
            | Not Logic
            | Logic `Cons` Logic
              deriving (Eq, Ord)
+
+firstl :: Logic -> Logic
+firstl (Var _) = error "No subexpr"
+firstl (Not e) = e
+firstl (Or e _) = e
+firstl (And e _) = e
+firstl (Cons e _) = e
+
+secondl :: Logic -> Logic
+secondl (Var _) = error "No subexpr"
+secondl (Not _) = error "No subexpr"
+secondl (Or _ e) = e
+secondl (And _ e) = e
+secondl (Cons _ e) = e
 
 -- Parsing grammar
 lexem :: Parser a -> Parser a
@@ -35,7 +55,7 @@ tok = var <|> parenExpr
 denial :: Parser Logic
 denial =   try (do
                  char '!'
-                 return . Not =<< tok)
+                 return . Not =<< denial)
        <|> tok
 
 leftAssocRec :: Parser Logic -> (Logic -> Logic -> Logic) -> Char -> Logic -> Parser Logic
@@ -112,3 +132,6 @@ instance Show Logic where
   show e@(a `And` b) = brackets (>) a e ++ " & " ++ brackets similarOrGt b e
   show e@(a `Or` b) = brackets (>) a e ++ " | " ++ brackets similarOrGt b e
   show e@(a `Cons` b) = brackets similarOrGt a e ++ " -> " ++ show b
+
+instance Hashable Logic where
+  hashWithSalt salt = hashWithSalt salt . show
