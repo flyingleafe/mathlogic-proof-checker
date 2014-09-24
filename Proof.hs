@@ -1,31 +1,39 @@
 module Proof where
 
-import Parser
+import LogicType
+import Parser()
+import Utils
 import Control.Monad
 import Control.Monad.ST
 import Data.STRef
 import Data.Hashable
 import qualified Data.HashTable.ST.Basic as HT
 
+data Annotation = Failed
+                | Assumption
+                | Axiom Int
+                | MP Int Int
+                  deriving Eq
+
+instance Show Annotation where
+  show Failed = "Не доказано"
+  show (Axiom i) = "Сх. акс. " ++ show i
+  show (MP i j) = "M.P. " ++ show i ++ ", " ++ show j
+
 type Fail = String
-type Annotation = String
-type CheckedProof = Either Fail [(Logic, Annotation)]
-type NumLogic = (Integer, Logic)
+type Proof = [Logic]
+type InitContext = [Logic]
+type CheckedProof = [(Int, Logic, Annotation)]
+type NumLogic = (Int, Logic)
 type ProofContext s = (HT.HashTable s Logic [NumLogic],
-                       HT.HashTable s Logic [NumLogic])
+                       HT.HashTable s Logic NumLogic)
 
 readLogic :: String -> Logic
 readLogic = read
 
-pairM :: Monad m => (m a, m b) -> m (a, b)
-pairM (f, s) = do
-  a <- f
-  b <- s
-  return (a, b)
-
 axioms :: [NumLogic]
 axioms = [ (1, readLogic "a -> b -> a")
-         , (2, readLogic "(a -> b) -> (a -> b -> a) -> (a -> c)")
+         , (2, readLogic "(a -> b) -> (a -> b -> c) -> (a -> c)")
          , (3, readLogic "a -> b -> a & b")
          , (4, readLogic "a & b -> a")
          , (5, readLogic "a & b -> b")
@@ -54,7 +62,7 @@ compareAsTemplate tmpl expr = do
                    return $ f && s
   cmpInner tmpl expr
 
-appendToHT :: (Hashable k, Eq k) =>  HT.HashTable s k [v] -> k -> v -> ST s ()
+appendToHT :: (Hashable k, Eq k) => HT.HashTable s k [v] -> k -> v -> ST s ()
 appendToHT t k v = do
   res <- HT.lookup t k
   case res of
@@ -66,31 +74,31 @@ putInContext (tails, full) nl@(_, expr) = do
   case expr of
     Cons _ end -> appendToHT tails end nl
     _ -> return ()
-  appendToHT full expr nl
+  HT.insert full expr nl
 
-proofCheck :: [Logic] -> ST s CheckedProof
-proofCheck exprs = do
+proofCheck :: InitContext -> Proof -> ST s CheckedProof
+proofCheck initCtx exprs = do
   context <- pairM (HT.new, HT.new)
   counter <- newSTRef 1
-  processed <- forM exprs $ \expr -> do
-                     res <- checkExpr context expr
-                     case res of
-                       Just (e, _) -> do
-                         i <- readSTRef counter
-                         putInContext context (i, e)
-                         modifySTRef counter (+ 1)
-                         return res
-                       Nothing -> return Nothing
-  case sequence processed of
-   Just list -> return $ Right list
-   Nothing -> return $ Left "Высказывание не доказано."
+  forM exprs $ \expr -> do
+    (e, a) <- checkExpr initCtx context expr
+    i <- readSTRef counter
+    when (a /= Failed) $ do
+      putInContext context (i, e)
+    modifySTRef counter (+ 1)
+    return (i, e, a)
 
-checkExpr :: ProofContext s -> Logic -> ST s (Maybe (Logic, Annotation))
-checkExpr context expr = do
-  axCheck <- checkForAxiom expr
-  case axCheck of
-    Just _ -> return axCheck
-    Nothing -> checkForMP context expr
+checkExpr :: InitContext -> ProofContext s -> Logic -> ST s (Logic, Annotation)
+checkExpr initCtx context expr = do
+  if expr `elem` initCtx
+    then return (expr, Assumption)
+    else do
+      axCheck <- checkForAxiom expr
+      case axCheck of
+       Just e -> return e
+       Nothing -> do
+         mpres <- checkForMP context expr
+         return $ maybe (expr, Failed) id mpres
 
 checkForAxiom :: Logic -> ST s (Maybe (Logic, Annotation))
 checkForAxiom expr = do
@@ -100,7 +108,7 @@ checkForAxiom expr = do
     if isAxiom then writeSTRef axNum i else return ()
   j <- readSTRef axNum
   if j /= 0
-     then return $ Just (expr, "сх. акс. " ++ show j)
+     then return $ Just (expr, Axiom j)
      else return Nothing
 
 takeList :: (Hashable k, Eq k) => HT.HashTable s k [v] -> k -> ST s [v]
@@ -112,8 +120,8 @@ checkForMP :: ProofContext s -> Logic -> ST s (Maybe (Logic, Annotation))
 checkForMP (tails, fulls) expr = do
   ends <- takeList tails expr
   options <- forM ends $
-             \(i, (Cons a _)) -> pairM (return i, takeList fulls a)
-  let fetchOption before (_, []) = before
-      fetchOption _ (i, ((j, _):_)) = Just (i, j)
+             \(i, (Cons a _)) -> pairM (return i, HT.lookup fulls a)
+  let fetchOption before (_, Nothing) = before
+      fetchOption _ (i, Just (j, _)) = Just (i, j)
       thatsIt = foldl fetchOption Nothing options
-  return $ fmap (\(i, j) -> (expr, "M. P. " ++ show j ++ ", " ++ show i)) thatsIt
+  return $ fmap (\(i, j) -> (expr, MP j i)) thatsIt

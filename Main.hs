@@ -1,10 +1,13 @@
+{-# LANGUAGE NoImplicitPrelude, OverloadedStrings #-}
 module Main where
 
+import Prelude hiding (unlines, concat)
 import Proof
 import Parser
-import System.IO
+import System.IO hiding (hGetContents, hPutStrLn)
 import System.Environment
 import Control.Monad.ST
+import Data.ByteString.Char8 hiding (map)
 
 mSeq :: Monad m => (a -> m b) -> [a] -> m b
 mSeq _ [] = error "Empty list"
@@ -17,15 +20,14 @@ main = do
   inp  <- openFile inputFile ReadMode
   outp <- openFile outputFile WriteMode
   cnt <- hGetContents inp
-  let statements = sequence . map parseLine . lines $ cnt
+  let statements = parseProof cnt
   case statements of
     Left err -> hPrint outp err
     Right exprs -> do
-      let checked = runST $ proofCheck exprs
-      case checked of
-       Left err -> hPutStrLn outp err
-       Right list ->
-         let showChecked (l, an) = show l ++ " (" ++ an ++ ")"
-         in hPutStrLn outp $ unlines . map showChecked $ list
+      let checked = runST $ proofCheck [] exprs
+          showChecked (i, l, an) = concat ["(", pack $ show i, ") ",
+                                           pack $ show l,
+                                           " (", pack $ show an,  ")"]
+         in hPutStrLn outp $ unlines . map showChecked $ checked
   hClose inp
   hClose outp
