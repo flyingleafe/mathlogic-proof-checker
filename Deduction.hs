@@ -28,7 +28,7 @@ rebuildProof (DC me ls) = concatMap rebuild ls
             if e == me then selfImpl e
             else case a of
                    MP i j -> rebuildMP me e (get i) (get j)
-                   _ -> [e]
+                   _ -> rebuildKnown me e
           get i = fst $ fromMaybe undefined $ lookup i ls
 
 selfImpl :: Logic -> Proof
@@ -48,3 +48,9 @@ rebuildMP me e bi bj =
     ((me `Cons` bj) `Cons` (me `Cons` e))
   , (me `Cons` bj) `Cons` (me `Cons` e)
   , (me `Cons` e)]
+
+rebuildKnown :: Logic -> Logic -> Proof
+rebuildKnown me e =
+  [ e
+  , e `Cons` (me `Cons` e)
+  , me `Cons` e]

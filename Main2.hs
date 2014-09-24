@@ -4,7 +4,7 @@ import Parser
 import Deduction
 import System.IO
 import System.Environment
-import Control.Monad.ST
+import Data.List
 import qualified Data.ByteString as BS
 
 main :: IO ()
@@ -18,7 +18,7 @@ main = do
    Left err -> hPutStrLn outp $ show err
    Right (heading, oldProof) -> do
      let ((ctx, derived), newProof) = applyDeduction heading oldProof
-         showCtx c d = concatMap (\x -> show x ++ ",") c ++
+         showCtx c d = (intercalate ", " . map show) c ++
                        " |- " ++ show d
      hPutStrLn outp $ showCtx ctx derived
      hPutStrLn outp $ unlines . map show $ newProof
