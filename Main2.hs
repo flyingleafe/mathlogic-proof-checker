@@ -1,17 +1,14 @@
 module Main where
 
+import Utils
 import Parser
 import Deduction
 import System.IO
-import System.Environment
 import Data.List
 import qualified Data.ByteString as BS
 
 main :: IO ()
-main = do
-  (inputFile:outputFile:_) <- getArgs
-  inp  <- openFile inputFile ReadMode
-  outp <- openFile outputFile WriteMode
+main = ioFromCmd $ \inp outp -> do
   cnt <- BS.hGetContents inp
   let parsed = parseProofWithHeading cnt
   case parsed of
@@ -22,5 +19,3 @@ main = do
                        " |- " ++ show d
      hPutStrLn outp $ showCtx ctx derived
      hPutStrLn outp $ unlines . map show $ newProof
-  hClose inp
-  hClose outp

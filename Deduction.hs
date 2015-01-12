@@ -1,7 +1,8 @@
+{-# LANGUAGE QuasiQuotes #-}
 module Deduction where
 
 import LogicType
-import Utils
+import LogicTemplates
 import Parser()
 import Proof
 import Control.Monad.ST
@@ -20,7 +21,7 @@ applyDeduction (ctx, expr) proof =
       checked' = map (\(i, e, a) -> (i, (e, a))) checked
       context = DC (last ctx) checked'
   in
-  ((newCtx, me `Cons` expr), rebuildProof context)
+  ((newCtx, me :-> expr), rebuildProof context)
 
 rebuildProof :: DeductionContext -> Proof
 rebuildProof (DC me ls) = concatMap rebuild ls
@@ -32,25 +33,17 @@ rebuildProof (DC me ls) = concatMap rebuild ls
           get i = fst $ fromMaybe undefined $ lookup i ls
 
 selfImpl :: Logic -> Proof
-selfImpl e =
-  [ e `Cons` (e `Cons` e)
-  , (e `Cons` (e `Cons` e)) `Cons`
-    ((e `Cons` (e `Cons` e `Cons` e)) `Cons`
-     (e `Cons` e))
-  , (e `Cons` (e `Cons` e `Cons` e)) `Cons`
-    (e `Cons` e)
-  , e `Cons` (e `Cons` e `Cons` e)
-  , e `Cons` e]
+selfImpl a = [logicF|TextProofs/SelfCons.txt|]
 
 rebuildMP :: Logic -> Logic -> Logic -> Logic -> Proof
 rebuildMP me e bi bj =
-  [ (me `Cons` bi) `Cons`
-    ((me `Cons` bj) `Cons` (me `Cons` e))
-  , (me `Cons` bj) `Cons` (me `Cons` e)
-  , (me `Cons` e)]
+  [ (me :-> bi) :->
+    ((me :-> bj) :-> (me :-> e))
+  , (me :-> bj) :-> (me :-> e)
+  , (me :-> e)]
 
 rebuildKnown :: Logic -> Logic -> Proof
 rebuildKnown me e =
   [ e
-  , e `Cons` (me `Cons` e)
-  , me `Cons` e]
+  , e :-> (me :-> e)
+  , me :-> e]

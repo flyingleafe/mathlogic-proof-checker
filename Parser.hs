@@ -2,53 +2,87 @@
 module Parser where
 
 import LogicType
+import ExprType
 import Utils
 import Text.Parsec
 import Text.Parsec.ByteString
 import Text.Parsec.Expr
 import Data.String
 import Data.ByteString hiding (drop)
+import Control.Monad
+import Control.Applicative ((<$>), (<*>), (<*), (*>))
 
 -- Parsing grammar
 
-lexeme p = do { res <- p; spaces; return res; }
+spaces' :: Parser ()
+spaces' = skipMany $ char ' '
+lexeme p = do { res <- p; spaces'; return res; }
 parens p = do
-  char '(' >> spaces
+  char '(' >> spaces'
   res <- p
-  spaces
-  char ')' >> spaces
+  spaces'
+  char ')' >> spaces'
   return res
-symbol s = do { res <- string s; spaces; return res; }
-
-optMaybe :: Parser a -> Parser (Maybe a)
-optMaybe = optionMaybe
+symbol s = do { res <- string s; spaces'; return res; }
+commaSep p = p `sepBy` symbol ","
 
 orParser = try $ do
   symbol "|"
   notFollowedBy $ char '-'
-  return Or
+  return (:|)
 
-exprTable = [ [binary "&" And AssocLeft]
+exprTable = [ [binary "&" (:&) AssocLeft]
             , [Infix orParser AssocLeft]
-            , [binary "->" Cons AssocRight]]
+            , [binary "->" (:->) AssocRight]]
 
 binary name fun assoc = Infix (symbol name >> return fun) assoc
 
 expr :: Parser Logic
 expr = buildExpressionParser exprTable tok
 
-proof = many expr
-
-denial :: Parser Logic
-denial = do
-  symbol "!"
-  t <- tok
-  return $ Not t
+proof = many $ expr <* optional endOfLine
 
 tok :: Parser Logic
-tok = parens expr <|> denial <|> do
-  var <- lexeme $ many1 alphaNum
-  return $ Var var
+tok = try predicate <|> denial <|> parens expr -- <|> quantor
+
+denial :: Parser Logic
+denial = symbol "!" >> tok >>= return . Not
+
+quantor :: Parser Logic
+quantor = undefined
+
+predicate :: Parser Logic
+predicate = namedPred <|> eqPred
+
+namedPred :: Parser Logic
+namedPred = do
+  name <- lexeme $ (:) <$> upper <*> many digit
+  exprs <- parens (commaSep arith) <|> return []
+  return $ Pred (VarID name exprs)
+
+eqPred = do
+  frst <- arith
+  symbol "="
+  scnd <- arith
+  return $ Pred (VarID "=" [frst, scnd])
+
+arithTable = [ [Postfix (symbol "'" >> return Succ)]
+             , [binary "*" Mul AssocLeft]
+             , [binary "+" Add AssocLeft]]
+
+arith = buildExpressionParser arithTable mult
+
+mult :: Parser Expr
+mult = try func <|> var <|> parens arith <|> (symbol "0" >> return Zero)
+
+vname = lexeme $ (:) <$> lower <*> many digit
+
+func = do
+  name <- vname
+  exprs <- parens $ commaSep arith
+  return $ Func name exprs
+
+var = vname >>= return . Var
 
 parseProof :: ByteString -> Either ParseError [Logic]
 parseProof = parse proof ""
@@ -69,7 +103,7 @@ instance Read Logic where
 -- Derivability parsing
 derivParser :: Parser ([Logic], Logic)
 derivParser = do
-  cs <- expr `sepBy` symbol ","
+  cs <- commaSep expr
   symbol "|-"
   e <- expr
   return (cs, e)
@@ -78,3 +112,23 @@ parseDerivability :: ByteString -> Either ParseError ([Logic], Logic)
 parseDerivability = parse derivParser ""
 
 parseProofWithHeading = parse (pairM (derivParser, proof)) ""
+
+parseT :: Monad m => Parser a -> (String, Int, Int) -> ByteString -> m a
+parseT p (file, line, col) s =
+  case parse p' "" s of
+    Left err -> fail $ show err
+    Right e -> return e
+    where p' = do updatePosition file line col
+                  spaces'
+                  e <- lexeme p
+                  eof
+                  return e
+
+updatePosition :: Monad m => String -> Int -> Int -> ParsecT s u m ()
+updatePosition file line col = do
+   pos <- getPosition
+   setPosition $
+     (flip setSourceName) file $
+     (flip setSourceLine) line $
+     (flip setSourceColumn) col $
+     pos

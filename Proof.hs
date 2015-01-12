@@ -1,6 +1,8 @@
+{-# LANGUAGE QuasiQuotes #-}
 module Proof where
 
 import LogicType
+import LogicTemplates
 import Parser()
 import Utils
 import Control.Monad
@@ -28,40 +30,6 @@ type NumLogic = (Int, Logic)
 type ProofContext s = (HT.HashTable s Logic [NumLogic],
                        HT.HashTable s Logic NumLogic)
 
-readLogic :: String -> Logic
-readLogic = read
-
-axioms :: [NumLogic]
-axioms = [ (1, readLogic "a -> b -> a")
-         , (2, readLogic "(a -> b) -> (a -> b -> c) -> (a -> c)")
-         , (3, readLogic "a -> b -> a & b")
-         , (4, readLogic "a & b -> a")
-         , (5, readLogic "a & b -> b")
-         , (6, readLogic "a -> a | b")
-         , (7, readLogic "b -> a | b")
-         , (8, readLogic "(a -> c) -> (b -> c) -> (a | b -> c)")
-         , (9, readLogic "(a -> b) -> (a -> !b) -> !a")
-         , (10, readLogic "!!a -> a")]
-
-compareAsTemplate :: Logic -> Logic -> ST s Bool
-compareAsTemplate tmpl expr = do
-  table <- HT.new
-  let cmpInner (Var s) e = do
-        look <- HT.lookup table s
-        case look of
-          Nothing -> HT.insert table s e >> return True
-          Just e' -> return $ e == e'
-      cmpInner t e =
-          if not (similar t e)
-          then return False
-          else case t of
-                 Not l -> cmpInner l $ firstl e
-                 _ -> do
-                   f <- cmpInner (firstl t) (firstl e)
-                   s <- cmpInner (secondl t) (secondl e)
-                   return $ f && s
-  cmpInner tmpl expr
-
 appendToHT :: (Hashable k, Eq k) => HT.HashTable s k [v] -> k -> v -> ST s ()
 appendToHT t k v = do
   res <- HT.lookup t k
@@ -72,8 +40,8 @@ appendToHT t k v = do
 putInContext :: ProofContext s -> NumLogic -> ST s ()
 putInContext (tails, full) nl@(_, expr) = do
   case expr of
-    Cons _ end -> appendToHT tails end nl
-    _ -> return ()
+   _ :-> end -> appendToHT tails end nl
+   _ -> return ()
   HT.insert full expr nl
 
 proofCheck :: InitContext -> Proof -> ST s CheckedProof
@@ -93,23 +61,33 @@ checkExpr initCtx context expr = do
   if expr `elem` initCtx
     then return (expr, Assumption)
     else do
-      axCheck <- checkForAxiom expr
+      let axCheck = checkForAxiom expr
       case axCheck of
        Just e -> return e
        Nothing -> do
          mpres <- checkForMP context expr
          return $ maybe (expr, Failed) id mpres
 
-checkForAxiom :: Logic -> ST s (Maybe (Logic, Annotation))
-checkForAxiom expr = do
-  axNum <- newSTRef 0
-  forM_ axioms $ \(i, axiom) -> do
-    isAxiom <- compareAsTemplate axiom expr
-    if isAxiom then writeSTRef axNum i else return ()
-  j <- readSTRef axNum
-  if j /= 0
-     then return $ Just (expr, Axiom j)
-     else return Nothing
+checkForAxiom :: Logic -> Maybe (Logic, Annotation)
+checkForAxiom e@[logic|A -> B -> C|]
+    | a == c = Just (e, Axiom 1)
+checkForAxiom e@[logic|(A -> B) -> (C -> D -> F) -> (G -> H)|]
+    | a == c && a == g && f == h && b == d = Just (e, Axiom 2)
+checkForAxiom e@[logic|A -> B -> C & D|]
+    | a == c && b == d = Just (e, Axiom 3)
+checkForAxiom e@[logic|A & B -> C|]
+    | a == c = Just (e, Axiom 4)
+    | b == c = Just (e, Axiom 5)
+checkForAxiom e@[logic|A -> B | C|]
+    | a == b = Just (e, Axiom 6)
+    | a == c = Just (e, Axiom 7)
+checkForAxiom e@[logic|(A -> C) -> (B -> D) -> (F | G -> H)|]
+    | c == d && a == f && b == g && c == h = Just (e, Axiom 8)
+checkForAxiom e@[logic|(A -> B) -> (C -> !D) -> !F|]
+    | a == c && b == d && a == f = Just (e, Axiom 9)
+checkForAxiom e@[logic|!!A -> B|]
+    | a == b  = Just (e, Axiom 10)
+checkForAxiom _ = Nothing
 
 takeList :: (Hashable k, Eq k) => HT.HashTable s k [v] -> k -> ST s [v]
 takeList t k = do
@@ -120,7 +98,7 @@ checkForMP :: ProofContext s -> Logic -> ST s (Maybe (Logic, Annotation))
 checkForMP (tails, fulls) expr = do
   ends <- takeList tails expr
   options <- forM ends $
-             \(i, (Cons a _)) -> pairM (return i, HT.lookup fulls a)
+             \(i, (a :-> _)) -> pairM (return i, HT.lookup fulls a)
   let fetchOption before (_, Nothing) = before
       fetchOption _ (i, Just (j, _)) = Just (i, j)
       thatsIt = foldl fetchOption Nothing options
