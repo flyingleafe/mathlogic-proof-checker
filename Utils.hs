@@ -5,6 +5,7 @@ import System.Environment
 import Data.Char
 import qualified Data.Set as S
 import Control.Monad
+import Data.List
 
 lowercase :: String -> String
 lowercase = map toLower
@@ -21,11 +22,21 @@ pairM (f, s) = do
 concatSeq :: Monad m => [m [a]] -> m [a]
 concatSeq = liftM concat . sequence
 
+orElse :: Monad m => Maybe a -> m (Maybe a) -> m (Maybe a)
+orElse (Just e) _ = return $ Just e
+orElse Nothing s = s
+
 fastNub :: Ord a => [a] -> [a]
 fastNub = go S.empty
   where go _ [] = []
         go s (x:xs) | S.member x s = go s xs
                     | otherwise    = x : go (S.insert x s) xs
+
+unionMap :: Ord b => (a -> [b]) -> [a] -> [b]
+unionMap f = fastNub . concatMap f
+
+unite :: Ord a => [[a]] -> [a]
+unite = unionMap id
 
 pairs :: [a] -> Maybe [(a, a)]
 pairs [] = Just []
@@ -36,10 +47,17 @@ maybeToEither :: Maybe a -> e -> Either e a
 maybeToEither Nothing e = Left e
 maybeToEither (Just a) _ = Right a
 
+fromEither :: Either a b -> b
+fromEither (Right b) = b
+fromEither (Left _) = error "Invalid get from either"
+
 bracketed :: Show a => (a -> t -> Bool) -> a -> t -> [Char]
 bracketed comp a e
     | a `comp` e = "(" ++ show a ++ ")"
     | otherwise = show a
+
+showCtx :: Show a => [a] -> a -> String
+showCtx c d = (intercalate ", " . map show) c ++ "|-" ++ show d
 
 ioFromCmd :: (Handle -> Handle -> IO ()) -> IO ()
 ioFromCmd action = do

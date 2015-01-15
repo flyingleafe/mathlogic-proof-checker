@@ -66,8 +66,8 @@ mergeProofs :: [(InitContext, Proof)] -> Maybe Proof
 mergeProofs [([], p)] = Just p
 mergeProofs epp = pairs epp >>= mergeProofs . map merge2
     where merge2 ((c1, p1), (c2, p2)) = (newc, np1 ++ np2 ++ tnd ++ excl)
-            where ((newc, r :-> a), np1) = applyDeduction (c1, last p1) p1
-                  (_, np2) = applyDeduction (c2, last p2) p2
+            where ((newc, r :-> a), np1) = fromEither $ applyDeduction (c1, last p1) p1
+                  (_, np2) = fromEither $ applyDeduction (c2, last p2) p2
                   tnd = tertiumNonDatum r
                   excl = [logicF|TextProofs/Exclusion.txt|]
 

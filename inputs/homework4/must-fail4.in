@@ -1,0 +1,2 @@
+A(b,c,d) |- @a(A->B(x,z)->C(a,b)|@x(x=a)&?z(z=b)) -> (A->B(x,z)->C(f(x,a),b)|@x(x=f(x,a))&?z(z=b))
+@a(A->B(x,z)->C(a,b)|@x(x=a)&?z(z=b)) -> (A->B(x,z)->C(f(x,a),b)|@x(x=f(x,a))&?z(z=b))

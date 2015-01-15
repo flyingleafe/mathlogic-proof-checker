@@ -26,7 +26,8 @@ quoteLogicPat s = do
   dataToPatQ (const Nothing `extQ` takePatternVar) e
 
 takeVar :: (TH.Name -> TH.Q a) -> VarTrans a
-takeVar namef p@(Pred _) =  Just $ namef (TH.mkName $ lowercase $ show p)
+takeVar namef (Pred (VarID name es))
+  | length es == 0 = Just $ namef (TH.mkName $ lowercase name)
 takeVar _ _ = Nothing
 
 takePatternVar = takeVar TH.varP

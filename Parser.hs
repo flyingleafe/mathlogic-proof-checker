@@ -8,7 +8,7 @@ import Text.Parsec
 import Text.Parsec.ByteString
 import Text.Parsec.Expr
 import Data.String
-import Data.ByteString hiding (drop)
+import Data.ByteString hiding (drop, foldl, foldr)
 import Control.Monad
 import Control.Applicative ((<$>), (<*>), (<*), (*>))
 
@@ -43,13 +43,17 @@ expr = buildExpressionParser exprTable tok
 proof = many $ expr <* optional endOfLine
 
 tok :: Parser Logic
-tok = try predicate <|> denial <|> parens expr -- <|> quantor
+tok = try predicate <|> denial <|> parens expr <|> quantor
 
 denial :: Parser Logic
 denial = symbol "!" >> tok >>= return . Not
 
 quantor :: Parser Logic
-quantor = undefined
+quantor = do
+  tp <- (symbol "@" >> return Forall) <|> (symbol "?" >> return Exists)
+  v <- vname
+  e <- tok
+  return $ Quant tp v e
 
 predicate :: Parser Logic
 predicate = namedPred <|> eqPred
@@ -66,11 +70,15 @@ eqPred = do
   scnd <- arith
   return $ Pred (VarID "=" [frst, scnd])
 
-arithTable = [ [Postfix (symbol "'" >> return Succ)]
-             , [binary "*" Mul AssocLeft]
+arithTable = [ [binary "*" Mul AssocLeft]
              , [binary "+" Add AssocLeft]]
 
-arith = buildExpressionParser arithTable mult
+arith = buildExpressionParser arithTable succ'
+
+succ' = do
+  core <- mult
+  ticks <- many $ char '\''
+  return $ foldr (\_ a -> Succ a) core ticks
 
 mult :: Parser Expr
 mult = try func <|> var <|> parens arith <|> (symbol "0" >> return Zero)
@@ -111,7 +119,7 @@ derivParser = do
 parseDerivability :: ByteString -> Either ParseError ([Logic], Logic)
 parseDerivability = parse derivParser ""
 
-parseProofWithHeading = parse (pairM (derivParser, proof)) ""
+parseProofWithHeading = parse (pairM (derivParser <* endOfLine, proof)) ""
 
 parseT :: Monad m => Parser a -> (String, Int, Int) -> ByteString -> m a
 parseT p (file, line, col) s =
