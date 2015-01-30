@@ -1,0 +1,4 @@
+@x(@xP(x)&Q(x))|-@yP(f(y))->?x@yP(x)
+@tP(f(y))->?x@tP(x)
+@tP(f(y))->@y(?x@tP(x))
+@yP(f(y))->?x@yP(x)

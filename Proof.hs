@@ -31,7 +31,7 @@ instance Show ErrType where
     show (NonFreeForSubst phi a x) =  "терм " ++ show phi ++
                       " не свободен для подстановки в формулу " ++
                       show a ++ " вместо переменной " ++ x
-    show (EntersFreely v a) = "переменная " ++ v ++ "входит свободно в формулу " ++ show a
+    show (EntersFreely v a) = "переменная " ++ v ++ " входит свободно в формулу " ++ show a
     show (AssumptionMismatch p v e) = "используется " ++ show p ++
                                    " c квантором по переменной " ++ v ++
                                    ", входящей свободно в допущение " ++ show e

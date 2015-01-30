@@ -38,6 +38,9 @@ unionMap f = fastNub . concatMap f
 unite :: Ord a => [[a]] -> [a]
 unite = unionMap id
 
+isSubsetOf :: Eq a => [a] -> [a] -> Bool
+isSubsetOf a b = a \\ b == []
+
 pairs :: [a] -> Maybe [(a, a)]
 pairs [] = Just []
 pairs [_] = Nothing

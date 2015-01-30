@@ -1,0 +1,7 @@
+P(x),@x(@xP(x)&Q(x))|-@xP(x)
+P(x)
+P(x)->(A&B->A)->P(x)
+(A&B->A)->P(x)
+(A&B->A)->@xP(x)
+(A&B->A)
+@xP(x)

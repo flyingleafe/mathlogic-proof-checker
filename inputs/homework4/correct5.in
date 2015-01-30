@@ -1,0 +1,7 @@
+P(a)|-@xP(a)
+P(a)
+A->A->A
+P(a)->(A->A->A)->P(a)
+(A->A->A)->P(a)
+(A->A->A)->@xP(a)
+@xP(a)

@@ -1,0 +1,7 @@
+V|-@x(@xP(x)&Q(x))->@x(@xP(x)&Q(x))
+@x(Q(x))->Q(x)
+@x(P(x)&Q(x))->P(x)&Q(x)
+@x(@yP(y)&Q(x))->@yP(y)&Q(x)
+@x((@yP(y))&Q(x))->(@yP(y))&Q(x)
+@x((@xP(x))&Q(x))->(@xP(x))&Q(x)
+@x(@xP(x)&Q(x))->@x(@xP(x)&Q(x))
