@@ -3,7 +3,6 @@ module Kripke where
 import LogicType
 import Utils
 import Data.List
-import Control.Applicative
 
 data KTree = KTree { forced :: [String]
                    , restricted :: [String]
@@ -12,6 +11,9 @@ data KTree = KTree { forced :: [String]
 
 instance Show KTree where
     show = showIndented 0
+
+forAllWorlds f t = f t && all (forAllWorlds f) (children t)
+forAnyWorld f t = f t || any (forAnyWorld f) (children t)
 
 showIndented :: Int -> KTree -> String
 showIndented n (KTree f _ []) = take n (repeat ' ') ++ "(" ++ intercalate "," f ++ ")" ++ "\n"
@@ -56,8 +58,25 @@ buildUnmodel (a :& b) = buildUnmodel a ++ buildUnmodel b
 buildUnmodel (a :-> b) = fmap chTree $
                          buildModel a `mergeMbTrees` buildUnmodel b
 
-validateUnmodel :: Logic -> KTree -> Bool
-validateUnmodel ()
+validateWorld :: Logic -> KTree -> Bool
+validateWorld (Pred (VarID s _)) w = s `elem` forced w
+validateWorld (Not l) w = forAllWorlds (not . validateWorld l) w
+validateWorld (a :| b) w = validateWorld a w || validateWorld b w
+validateWorld (a :& b) w = validateWorld a w && validateWorld b w
+validateWorld (a :-> b) w = forAllWorlds (\t -> if validateWorld a t
+                                                then validateWorld b t
+                                                else True) w
+
+unvalidateWorld :: Logic -> KTree -> Bool
+unvalidateWorld (Pred (VarID s _)) w = not $ s `elem` forced w
+unvalidateWorld (Not l) w = forAnyWorld (validateWorld l) w
+unvalidateWorld (a :| b) w = unvalidateWorld a w && unvalidateWorld b w
+unvalidateWorld (a :& b) w = unvalidateWorld a w || unvalidateWorld b w
+unvalidateWorld (a :-> b) w = forAnyWorld (\t -> validateWorld a t &&
+                                                 unvalidateWorld b t) w
+
+validateModel = forAllWorlds . validateWorld
+validateUnmodel = forAnyWorld . unvalidateWorld
 
 unProve :: Logic -> Maybe KTree
 unProve l = findOk $ buildUnmodel l
@@ -67,7 +86,7 @@ unProve l = findOk $ buildUnmodel l
               | otherwise = findOk ts
 
 mergeTrees' :: KTree -> KTree -> [KTree]
-mergeTrees' t@(KTree f r ch) t'@(KTree f' r' ch')
+mergeTrees' (KTree f r ch) (KTree f' r' ch')
     | intersect f r' /= [] = []
     | intersect f' r /= [] = []
     | otherwise = [KTree (union f f') (union r r') (ch ++ ch')]
