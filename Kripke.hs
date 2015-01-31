@@ -48,7 +48,9 @@ buildModel (Not l) = fmap chTree $ buildUnmodel l
 buildModel (a :| b) = buildModel a ++ buildModel b
 buildModel (a :& b) = buildModel a `mergeMbTrees` buildModel b
 buildModel (a :-> b) = fmap chTree $
-                       buildModel a ++ buildUnmodel b
+                       (buildModel a `mergeMbTrees` buildModel b) ++
+                       (buildUnmodel a `mergeMbTrees` buildModel b) ++
+                       (buildUnmodel a `mergeMbTrees` buildUnmodel b)
 
 buildUnmodel :: Logic -> [KTree]
 buildUnmodel (Pred (VarID s _)) = [KTree [] [s] []]
