@@ -24,8 +24,8 @@ showIndented n (KTree f _ (c:ch)) = take n (repeat ' ') ++ headParens ++
                                               n' = n + length headParens
 
 force, restrict :: String -> KTree -> KTree
-force v (KTree f r ch) = KTree (v:f) r $ map (force v) ch
-restrict v (KTree f r ch) = KTree f (v:r) $ map (restrict v) ch
+force v (KTree f r ch) = KTree (putInSet v f) r $ map (force v) ch
+restrict v (KTree f r ch) = KTree f (putInSet v r) $ map (restrict v) ch
 
 actAll f = foldl (\g v -> g . f v) id
 
@@ -37,13 +37,21 @@ pushRestricted (KTree f r ch) = KTree f rs' ch
     where rs' = fastNub $ r ++
                 [r' | c <- ch, r' <- restricted $ pushRestricted c]
 
+pushForced :: KTree -> KTree
+pushForced (KTree f r ch) = KTree f r ch'
+    where ch' = map (pushForced . forceAll f) ch
+
+pushAll = pushRestricted . pushForced
+
 addChild :: KTree -> KTree -> KTree
-addChild (KTree f r chs) ch = (KTree f (union r $ restricted ch) (ch:chs))
+addChild (KTree f r chs) ch = KTree f (union r $ restricted ch) $
+                              (forceAll f ch):chs
 
 chTree = addChild (KTree [] [] [])
 
 buildModel :: Logic -> [KTree]
 buildModel (Pred (VarID s _)) = [KTree [s] [] []]
+buildModel (Not (Pred (VarID s _))) = [KTree [] [s] []]
 buildModel (Not l) = fmap chTree $ buildUnmodel l
 buildModel (a :| b) = buildModel a ++ buildModel b
 buildModel (a :& b) = buildModel a `mergeMbTrees` buildModel b
@@ -53,7 +61,8 @@ buildModel (a :-> b) = fmap chTree $
                        (buildUnmodel a `mergeMbTrees` buildUnmodel b)
 
 buildUnmodel :: Logic -> [KTree]
-buildUnmodel (Pred (VarID s _)) = [KTree [] [s] []]
+buildUnmodel (Pred (VarID s _)) = [KTree [] [] []]
+buildUnmodel (Not (Pred (VarID s _))) = [KTree [] [] [KTree [s] [] []]]
 buildUnmodel (Not l) = fmap chTree $ buildModel l
 buildUnmodel (a :| b) = buildUnmodel a `mergeMbTrees` buildUnmodel b
 buildUnmodel (a :& b) = buildUnmodel a ++ buildUnmodel b
@@ -91,7 +100,7 @@ mergeTrees' :: KTree -> KTree -> [KTree]
 mergeTrees' (KTree f r ch) (KTree f' r' ch')
     | intersect f r' /= [] = []
     | intersect f' r /= [] = []
-    | otherwise = [KTree (union f f') (union r r') (ch ++ ch')]
+    | otherwise = [pushForced $ KTree (union f f') (union r r') (union ch ch')]
 
 mergeTrees a b = pushRestricted a `mergeTrees'` pushRestricted b
 

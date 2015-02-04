@@ -46,6 +46,13 @@ pairs [] = Just []
 pairs [_] = Nothing
 pairs (x:y:xs) = fmap ((x, y) :) $ pairs xs
 
+listOr :: [a] -> [a] -> [a]
+listOr [] b = b
+listOr a _ = a
+
+putInSet :: Eq a => a -> [a] -> [a]
+putInSet a xs = if a `elem` xs then xs else (a:xs)
+
 maybeToEither :: Maybe a -> e -> Either e a
 maybeToEither Nothing e = Left e
 maybeToEither (Just a) _ = Right a
